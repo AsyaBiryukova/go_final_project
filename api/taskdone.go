@@ -5,9 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	db "github.com/AsyaBiryukova/go_final_project/database"
+	nd "github.com/AsyaBiryukova/go_final_project/internal/nextdate"
 )
 
+// PostTaskDoneHandler обрабатывает запросы к /api/task/done с методом POST.
+// Если пользователь авторизован, удаляет задачи не имеющих правил повторения repeat, или обновляет дату выполнения задач, имеющих правило repeat.
+// Возвращает пустой JSON {} в случае успеха, или JSON {"error": error} при возникновение ошибки.
 func PostTaskDoneHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 
@@ -18,13 +21,13 @@ func PostTaskDoneHandler(w http.ResponseWriter, r *http.Request) {
 		writeErr(fmt.Errorf("некорректный формат id"), w)
 		return
 	}
-	task, err := db.GetTaskByID(id)
+	task, err := dbs.GetTaskByID(id)
 	if err != nil {
 		writeErr(err, w)
 		return
 	}
 	if len(task.Repeat) == 0 {
-		err = db.DeleteTask(id)
+		err = dbs.DeleteTask(id)
 		if err != nil {
 			writeErr(err, w)
 			return
@@ -32,14 +35,14 @@ func PostTaskDoneHandler(w http.ResponseWriter, r *http.Request) {
 		writeEmptyJson(w)
 		return
 	} else {
-		nextDate, err := NextDate(time.Now(), task.Date, task.Repeat)
+		nextDate, err := nd.NextDate(time.Now(), task.Date, task.Repeat)
 		if err != nil {
 			writeErr(err, w)
 			return
 		}
 		task.Date = nextDate
 	}
-	err = db.PutTask(task)
+	err = dbs.PutTask(task)
 	if err != nil {
 		writeErr(err, w)
 		return

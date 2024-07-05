@@ -30,7 +30,6 @@ func openDB(t *testing.T) *sqlx.DB {
 	require.NoError(t, err)
 
 	dbfile := DBFile
-
 	envFile := "../" + os.Getenv("TODO_DBFILE")
 	if len(envFile) > 0 {
 		dbfile = envFile
@@ -47,6 +46,7 @@ func TestDB(t *testing.T) {
 
 	before, err := count(db)
 	assert.NoError(t, err)
+
 	today := time.Now().Format(`20060102`)
 
 	res, err := db.Exec(`INSERT INTO scheduler (date, title, comment, repeat) 

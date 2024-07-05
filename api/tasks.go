@@ -8,14 +8,16 @@ import (
 	"regexp"
 	"time"
 
-	db "github.com/AsyaBiryukova/go_final_project/database"
+	db "github.com/AsyaBiryukova/go_final_project/internal/db"
 )
 
+// GetTasksHandler обрабатывает запросы к /api/tasks с методом GET.
+// Если пользователь авторизован, возвращает JSON {"tasks": Task} содержащий последние добавленные задачи, или
+// последние добавленные задачи соответствующие поисковому запросу search. В случае ошибки возвращает JSON {"error": error}.
 func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	var tasks []db.Task
 	var err error
 	var date time.Time
-	format := db.Format
 
 	// write отправляет клиенту ответ либо ошибку, в формате json
 	write := func() {
@@ -58,20 +60,20 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case len(search) == 0:
-		tasks, err = db.GetTaskList()
+		tasks, err = dbs.GetTasksList()
 
 	case isDate:
 		date, err = time.Parse("02.01.2006", search)
 		if err == nil {
-			search = date.Format(format)
-			tasks, err = db.GetTaskList(search)
+			search = date.Format(dateFormat)
+			tasks, err = dbs.GetTasksList(search)
 			break
 		}
 		fallthrough
 
 	default:
 		search = fmt.Sprint("%" + search + "%")
-		tasks, err = db.GetTaskList(search)
+		tasks, err = dbs.GetTasksList(search)
 
 	}
 

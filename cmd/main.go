@@ -2,72 +2,72 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+
+	"github.com/AsyaBiryukova/go_final_project/api"
+	"github.com/AsyaBiryukova/go_final_project/internal/auth"
+	"github.com/AsyaBiryukova/go_final_project/internal/db"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
-
-	"github.com/AsyaBiryukova/go_final_project/api"
-	db "github.com/AsyaBiryukova/go_final_project/database"
 )
 
 func main() {
-	//Подгружаем переменные среды
+	// Загружаем переменные среды
 	err := godotenv.Load(".env")
 	if err != nil {
 		fmt.Println(err)
 	}
+	// .env сам подгружается если мы используем docker compose для запуска, но для тестов удобнее запускать код напрямую, поэтому оставил godotenv
 
-	// Создаём бд, если её нет
-	if !db.DbExists() {
-		db.InstallDB()
+	dbFile := os.Getenv("TODO_DBFILE")
+
+	// Если бд не существует, создаём
+	if !db.DbExists(dbFile) {
+		err = db.InstallDB()
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
-	// Запускаем бд
-	db.StartDB()
-	defer db.DB.Close()
+	// Запуск бд
+	dbStorage, err := db.StartDB()
+	defer func() {
+		err := dbStorage.CloseDB()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
-	//Адрес для запуска сервера
+	if err != nil {
+		log.Fatal(err)
+	}
+	api.ApiInit(dbStorage)
+
+	// Адрес для запуска сервера
 	ip := ""
 	port := os.Getenv("TODO_PORT")
 	addr := fmt.Sprintf("%s:%s", ip, port)
 
-	//Роутер
+	// Router
 	r := chi.NewRouter()
 
 	r.Handle("/*", http.FileServer(http.Dir("./web")))
+
 	r.Get("/api/nextdate", api.GetNextDateHandler)
-	r.Get("/api/tasks", auth(api.GetTasksHandler))
-	r.Post("/api/task/done", auth(api.PostTaskDoneHandler))
-	r.Post("/api/signin", api.PostSigninHandler)
-	r.Handle("/api/task", auth(api.TaskHandler))
+	r.Get("/api/tasks", auth.Auth(api.GetTasksHandler))
+	r.Post("/api/task/done", auth.Auth(api.PostTaskDoneHandler))
+	r.Post("/api/signin", auth.Auth(api.PostSigninHandler))
+	r.Handle("/api/task", auth.Auth(api.TaskHandler))
 
-	//Запускаем сервер
-
+	// Запуск сервера
 	err = http.ListenAndServe(addr, r)
 	if err != nil {
-		panic(err)
+		log.Println(err)
 	}
-	fmt.Println("Завершаем работу")
-}
-
-func auth(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		// смотрим наличие пароля
-
-		pass := os.Getenv("TODO_PASSWORD")
-		if len(pass) > 0 {
-			err := api.GetAndVerifyToken(r)
-			if err != nil {
-				// возвращаем ошибку авторизации 401
-				http.Error(w, "Authentification required", http.StatusUnauthorized)
-				return
-			}
-		}
-		next(w, r)
-	})
+	log.Printf("Server running on %s\n", port)
 
 }

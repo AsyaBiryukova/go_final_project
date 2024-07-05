@@ -7,3 +7,4 @@ services:
       - "./.env"
     ports:
       - "${TODO_PORT}:${TODO_PORT}"
+      

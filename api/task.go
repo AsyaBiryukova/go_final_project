@@ -8,9 +8,14 @@ import (
 	"net/http"
 	"strconv"
 
-	db "github.com/AsyaBiryukova/go_final_project/database"
+	"github.com/AsyaBiryukova/go_final_project/internal/db"
 )
 
+// task.go содержит обработчики запросов к api/task
+
+// PostTaskHandler обрабатывает запрос с методом POST.
+// Если пользователь авторизован и задача отправлена в корректном формате, добавляет новую задачу в базу данных.
+// Возвращает JSON {"id": string} или JSON {"error": error} в случае ошибки.
 func TaskHandler(w http.ResponseWriter, r *http.Request) {
 	method := r.Method
 	switch method {
@@ -65,13 +70,13 @@ func postTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err = formatTask(task)
+	task, err = task.FormatTask()
 	if err != nil {
 		write()
 		return
 	}
 
-	id, err = db.AddTask(task)
+	id, err = dbs.AddTask(task)
 	write()
 }
 
@@ -106,13 +111,13 @@ func putTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedTask, err = formatTask(updatedTask)
+	updatedTask, err = updatedTask.FormatTask()
 	if err != nil {
 		write()
 		return
 	}
 
-	err = db.PutTask(updatedTask)
+	err = dbs.PutTask(updatedTask)
 	write()
 
 }
@@ -148,7 +153,7 @@ func getTask(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
 
-	task, err = db.GetTaskByID(id)
+	task, err = dbs.GetTaskByID(id)
 	if err != nil {
 		log.Println(err)
 	}
@@ -170,7 +175,7 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.DeleteTask(id)
+	err = dbs.DeleteTask(id)
 	if err != nil {
 		writeErr(err, w)
 		return
