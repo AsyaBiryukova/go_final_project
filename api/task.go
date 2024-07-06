@@ -30,54 +30,59 @@ func TaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func writeError(w http.ResponseWriter, err error, statusCode int) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(statusCode)
+	resp, _ := json.Marshal(map[string]string{"error": err.Error()})
+	w.Write(resp)
+}
+
+func writeResponse(w http.ResponseWriter, data interface{}, statusCode int) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(statusCode)
+	resp, err := json.Marshal(data)
+	if err != nil {
+		writeError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Write(resp)
+}
+
+// Пример использования в postTask
 func postTask(w http.ResponseWriter, r *http.Request) {
 	var task db.Task
 	var buf bytes.Buffer
-	var err error
 	var id int64
 
-	write := func() {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		if err != nil {
-			writeErr(err, w)
-			return
-		} else {
-			idResp := map[string]string{
-				"id": strconv.Itoa(int(id)),
-			}
-			resp, err := json.Marshal(idResp)
-			if err != nil {
-				log.Println(err)
-			}
-			w.WriteHeader(http.StatusCreated)
-			_, err = w.Write(resp)
-			if err != nil {
-				log.Println(err)
-			}
-			return
-		}
-
-	}
-
-	_, err = buf.ReadFrom(r.Body)
+	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
-		write()
+		writeError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
-		write()
+		writeError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	task, err = task.FormatTask()
 	if err != nil {
-		write()
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if task.Title == "" {
+		writeError(w, fmt.Errorf("missing required task fields"), http.StatusBadRequest)
 		return
 	}
 
 	id, err = dbs.AddTask(task)
-	write()
+	if err != nil {
+		writeError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	writeResponse(w, map[string]string{"id": strconv.Itoa(int(id))}, http.StatusCreated)
 }
 
 // PutTaskHandler обрабатывает запрос с методом PUT.
@@ -88,98 +93,76 @@ func putTask(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	var err error
 
-	write := func() {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		if err != nil {
-			writeErr(err, w)
-			return
-		} else {
-			writeEmptyJson(w)
-			return
-		}
-
-	}
-
 	_, err = buf.ReadFrom(r.Body)
 	if err != nil {
-		write()
+		writeError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	if err = json.Unmarshal(buf.Bytes(), &updatedTask); err != nil {
-		write()
+		writeError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	updatedTask, err = updatedTask.FormatTask()
 	if err != nil {
-		write()
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if updatedTask.Title == "" {
+		writeError(w, fmt.Errorf("title cannot be empty"), http.StatusBadRequest)
 		return
 	}
 
 	err = dbs.PutTask(updatedTask)
-	write()
+	if err != nil {
+		writeError(w, err, http.StatusInternalServerError)
+		return
+	}
 
+	writeResponse(w, struct{}{}, http.StatusOK)
 }
 
 // GetTaskHandler обрабатывает запрос с методом GET.
 // Если пользователь авторизован, возвращает задачу с указанным ID.
 // Возвращает JSON {"task":Task}, или JSON {"error": error} при ошибке.
 func getTask(w http.ResponseWriter, r *http.Request) {
-	var err error
 	var task db.Task
-
-	write := func() {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		var resp []byte
-		if err != nil {
-			writeErr(err, w)
-			return
-		} else {
-			resp, err = json.Marshal(task)
-		}
-
-		if err != nil {
-			log.Println(err)
-		}
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write(resp)
-		if err != nil {
-			log.Println(err)
-		}
-
-	}
 
 	q := r.URL.Query()
 	id := q.Get("id")
 
-	task, err = dbs.GetTaskByID(id)
+	task, err := dbs.GetTaskByID(id)
+	if err != nil {
+		writeError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	resp, err := json.Marshal(task)
 	if err != nil {
 		log.Println(err)
 	}
-	write()
-
+	_, err = w.Write(resp)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // DeleteTaskHandler обрабатывает запрос к api/task с методом DELETE.
 // Если пользователь авторизован и id существует, удаляет задачу.
 // При успешном выполнение возвращает пустой JSON {}. Иначе возвращает JSON {"error":error}.
 func deleteTask(w http.ResponseWriter, r *http.Request) {
-	var err error
-
 	q := r.URL.Query()
 	id := q.Get("id")
-	isID := isID(id)
-	if !isID {
-		writeErr(fmt.Errorf("некорректный формат id"), w)
-		return
-	}
 
-	err = dbs.DeleteTask(id)
+	err := dbs.DeleteTask(id)
 	if err != nil {
-		writeErr(err, w)
+		writeError(w, err, http.StatusInternalServerError)
 		return
 	}
-	writeEmptyJson(w)
 
+	writeResponse(w, struct{}{}, http.StatusOK)
 }

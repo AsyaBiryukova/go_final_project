@@ -64,10 +64,9 @@ func main() {
 	r.Handle("/api/task", auth.Auth(api.TaskHandler))
 
 	// Запуск сервера
+	log.Printf("Server running on %s\n", addr)
 	err = http.ListenAndServe(addr, r)
 	if err != nil {
 		log.Println(err)
 	}
-	log.Printf("Server running on %s\n", port)
-
 }

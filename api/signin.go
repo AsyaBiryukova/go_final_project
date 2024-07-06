@@ -19,56 +19,26 @@ var (
 // PostSigninHandler обрабатывает запросы к api/signin.
 // При корректном вводе пароля, возвращает JSON {"token":JWT}. В случае ошибки возвращает JSON {"error":error}
 func PostSigninHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
 	var buf bytes.Buffer
-	var err error
-	var body map[string]string
-	var password string
-	var signedToken string
-
-	write := func() {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		var resp []byte
-		if err != nil {
-			writeErr(err, w)
-			return
-		} else {
-			tokenResp := map[string]string{
-				"token": signedToken,
-			}
-			resp, err = json.Marshal(tokenResp)
-			if err != nil {
-				log.Println(err)
-			}
-			w.WriteHeader(http.StatusOK)
-			_, err = w.Write(resp)
-			if err != nil {
-				log.Println(err)
-			}
-			return
-		}
-
-	}
-
-	_, err = buf.ReadFrom(r.Body)
+	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
-		write()
+		writeErr(err, w)
 		return
 	}
 
+	var body map[string]string
 	if err = json.Unmarshal(buf.Bytes(), &body); err != nil {
-		write()
+		writeErr(err, w)
 		return
 	}
-	if len(body["password"]) == 0 {
-		err = fmt.Errorf("пустая строка вместо password")
-		write()
+	password := body["password"]
+	if len(password) == 0 {
+		writeErr(fmt.Errorf("пустая строка вместо password"), w)
 		return
-	} else {
-		password = body["password"]
-	}
-	if password != targetPassword {
-		err = fmt.Errorf("неправильный пароль")
-		write()
+	} else if password != targetPassword {
+		writeErr(fmt.Errorf("неправильный пароль"), w)
 		return
 	}
 
@@ -77,16 +47,24 @@ func PostSigninHandler(w http.ResponseWriter, r *http.Request) {
 		"Exp":      1550946689,
 	}
 
-	// создаём jwt и указываем алгоритм хеширования
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// получаем подписанный токен
-	signedToken, err = jwtToken.SignedString([]byte(targetPassword))
+	signedToken, err := jwtToken.SignedString([]byte(targetPassword))
 	if err != nil {
-		write()
+		writeErr(err, w)
 		return
 	}
 
-	write()
-
+	tokenResp := map[string]string{
+		"token": signedToken,
+	}
+	resp, err := json.Marshal(tokenResp)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(resp)
+	if err != nil {
+		log.Println(err)
+	}
 }

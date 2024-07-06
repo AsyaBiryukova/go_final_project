@@ -10,7 +10,7 @@ import (
 // task.go содержит функции CRUD для задач Task
 
 var (
-	rowsLimit = 15
+	taskLimit = 15
 )
 
 // AddTask отправляет SQL запрос на добавление переданной задачи Task. Возвращает ID добавленной задачи и/или ошибку.
@@ -29,7 +29,7 @@ func (dbHandl *Storage) AddTask(task Task) (int64, error) {
 func (dbHandl *Storage) GetTaskByID(id string) (Task, error) {
 	var task Task
 
-	row := dbHandl.db.QueryRow("SELECT * FROM scheduler WHERE id = :id", sql.Named("id", id))
+	row := dbHandl.db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = :id", sql.Named("id", id))
 
 	err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 	if err != nil {
@@ -37,7 +37,6 @@ func (dbHandl *Storage) GetTaskByID(id string) (Task, error) {
 		return Task{}, err
 	}
 	return task, nil
-
 }
 
 // PutTask отправляет SQL запрос на обновление задачи Task, возвращает ошибку в случае неудачи.
@@ -84,7 +83,7 @@ func (dbHandl *Storage) GetTasksList(search ...string) ([]Task, error) {
 
 	switch {
 	case len(search) == 0:
-		rows, err = dbHandl.db.Query("SELECT * FROM scheduler ORDER BY id LIMIT :limit", sql.Named("limit", rowsLimit))
+		rows, err = dbHandl.db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY id LIMIT :limit", sql.Named("limit", taskLimit))
 		if err != nil {
 			return []Task{}, err
 		}
@@ -92,17 +91,17 @@ func (dbHandl *Storage) GetTasksList(search ...string) ([]Task, error) {
 		search := search[0]
 		_, err = time.Parse(DateFormat, search)
 		if err != nil {
-			rows, err = dbHandl.db.Query("SELECT * FROM scheduler WHERE title LIKE :search OR comment LIKE :search ORDER BY date LIMIT :limit",
-				sql.Named("search", search),
-				sql.Named("limit", rowsLimit))
+			rows, err = dbHandl.db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE title LIKE :search OR comment LIKE :search ORDER BY date LIMIT :limit",
+				sql.Named("search", "%"+search+"%"),
+				sql.Named("limit", taskLimit))
 			if err != nil {
 				return []Task{}, err
 			}
 			break
 		}
-		rows, err = dbHandl.db.Query("SELECT * FROM scheduler WHERE date = :date LIMIT :limit",
+		rows, err = dbHandl.db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE date = :date LIMIT :limit",
 			sql.Named("date", search),
-			sql.Named("limit", rowsLimit))
+			sql.Named("limit", taskLimit))
 		if err != nil {
 			return []Task{}, err
 		}
