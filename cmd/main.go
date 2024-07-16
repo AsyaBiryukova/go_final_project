@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/AsyaBiryukova/go_final_project/api"
-	"github.com/AsyaBiryukova/go_final_project/internal/auth"
-	"github.com/AsyaBiryukova/go_final_project/internal/db"
+	"github.com/AsyaBiryukova/go_final_project/internal/App/models"
+	"github.com/AsyaBiryukova/go_final_project/internal/api"
+	"github.com/AsyaBiryukova/go_final_project/internal/server"
+	db "github.com/AsyaBiryukova/go_final_project/internal/sqlite3"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -45,28 +45,25 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	api.ApiInit(dbStorage)
+
+	DateFormat := os.Getenv("TODO_DATEFORMAT")
+
+	App := models.NewApp(dbStorage, DateFormat)
+
+	Api := api.NewApi(*App)
 
 	// Адрес для запуска сервера
 	ip := ""
 	port := os.Getenv("TODO_PORT")
 	addr := fmt.Sprintf("%s:%s", ip, port)
 
-	// Router
-	r := chi.NewRouter()
-
-	r.Handle("/*", http.FileServer(http.Dir("./web")))
-
-	r.Get("/api/nextdate", api.GetNextDateHandler)
-	r.Get("/api/tasks", auth.Auth(api.GetTasksHandler))
-	r.Post("/api/task/done", auth.Auth(api.PostTaskDoneHandler))
-	r.Post("/api/signin", auth.Auth(api.PostSigninHandler))
-	r.Handle("/api/task", auth.Auth(api.TaskHandler))
-
+	//Router
+	r := server.NewRouter(*Api)
 	// Запуск сервера
-	log.Printf("Server running on %s\n", addr)
 	err = http.ListenAndServe(addr, r)
 	if err != nil {
 		log.Println(err)
 	}
+	log.Printf("Server running on %s\n", port)
+
 }

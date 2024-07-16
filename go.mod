@@ -4,6 +4,7 @@ go 1.22.1
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-chi/chi v1.5.5 // indirect
 	github.com/go-chi/chi/v5 v5.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect

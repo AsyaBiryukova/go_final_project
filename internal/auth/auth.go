@@ -50,7 +50,7 @@ func verifyToken(signedToken string) bool {
 	if !ok {
 		return false
 	}
-	// костыль чтобы лениво преобразовать jwt.Claims password и password из .env к одному типу :')
+	// костыль чтобы лениво преобразовать jwt.Claims password и password из .env к одному типу
 	claimsPassChSm := fmt.Sprintf("%v", passRaw)
 	envPassChSm := fmt.Sprintf("%v", passwordChecksum)
 
